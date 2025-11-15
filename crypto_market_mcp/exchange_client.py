@@ -8,7 +8,7 @@ import ccxt
 
 from .config import DEFAULT_CONFIG
 from .errors import ExchangeUnavailableError, InvalidSymbolError, InvalidTimeRangeError
-from .cache import TTLCache
+from .cache import TTLCache, RedisCache
 
 
 @dataclass
@@ -39,7 +39,22 @@ class ExchangeClient:
             raise ExchangeUnavailableError(f"Unsupported exchange: {exchange_name}") from exc
 
         self._exchange = exchange_class({"enableRateLimit": config.exchange.enable_rate_limit})
-        self._cache = TTLCache(ttl_seconds=config.cache.ttl_seconds, maxsize=config.cache.maxsize)
+        
+        # Use Redis cache if configured, otherwise fall back to in-memory TTL cache
+        if config.cache.use_redis:
+            try:
+                self._cache = RedisCache(
+                    ttl_seconds=config.cache.ttl_seconds,
+                    redis_host=config.redis.host,
+                    redis_port=config.redis.port,
+                    redis_db=config.redis.db,
+                    redis_password=config.redis.password
+                )
+            except Exception:
+                # Fall back to in-memory cache if Redis is unavailable
+                self._cache = TTLCache(ttl_seconds=config.cache.ttl_seconds, maxsize=config.cache.maxsize)
+        else:
+            self._cache = TTLCache(ttl_seconds=config.cache.ttl_seconds, maxsize=config.cache.maxsize)
 
     def _load_markets(self) -> Dict[str, Any]:
         return self._cache.get_or_set("markets", lambda: self._exchange.load_markets())

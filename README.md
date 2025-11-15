@@ -10,7 +10,9 @@ Python-based Model Context Protocol (MCP) server for real-time and historical cr
   - `get_order_book(symbol, limit)` – order book snapshot
   - `stream_ticker(symbol, interval_seconds)` – streaming-style ticker updates via polling
 - Pluggable exchange backend (default: Binance via `ccxt`)
-- Simple TTL cache to reduce API load
+- **Redis cache support** for distributed caching across multiple server instances
+- **Redis Pub/Sub** for delegating requests to worker pools
+- Simple TTL cache fallback (in-memory)
 - Structured error handling
 - Small CLI chatbot client to exercise the MCP server.
 
@@ -22,15 +24,36 @@ python -m venv .venv
 pip install -e .[dev]
 ```
 
+Or with `uv`:
+```powershell
+uv sync
+```
+
 ## Running the MCP server
 
 The server is installed as a console script named `crypto-market-mcp`.
 
+### Standard mode (stdio)
 ```powershell
 crypto-market-mcp
 ```
 
 It speaks MCP over stdio, so it can be wired into any MCP-compatible host.
+
+### Worker mode (Redis Pub/Sub)
+Start one or more workers to process requests via Redis:
+```powershell
+crypto-market-worker
+```
+
+Configure via environment variables:
+```powershell
+$env:REDIS_HOST="localhost"
+$env:USE_REDIS_CACHE="true"
+crypto-market-worker
+```
+
+See [REDIS_INTEGRATION.md](REDIS_INTEGRATION.md) for detailed Redis setup and usage.
 
 ## Chatbot client
 
